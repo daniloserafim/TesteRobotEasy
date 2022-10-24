@@ -1,50 +1,77 @@
 ﻿using ApiCotacao.Libraries;
 using ApiCotacao.Model;
-using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
-using OpenQA.Selenium;
-using OpenQA.Selenium.Chrome;
-using System;
-using System.Text.Json.Nodes;
+using ApiCotacao.Repositories;
+using Microsoft.AspNetCore.Mvc;
 
 namespace ApiCotacao.Controllers
 {
-    public class CotacaoController
+    [Route("api/[controller]")]
+    [ApiController]
+    public class CotacaoController : ControllerBase
     {
-        //public static string GetCotacao(string moedaBase, string moedaAlvo)
-        //{
-            //Cotacao cotacao = new Cotacao();
-            //string valor = cotacao.GetEntry(moedaBase, moedaAlvo);
-            //if (valor != null)
-            //{
-            //    return valor;
-            //}
-
-            //CotacaoUseCases useCase = new CotacaoUseCases();
-
-            //valor = useCase.GetCotacaoSelenium(moedaBase, moedaAlvo);
-
-            //try
-            //{
-            //    cotacao.Insert(moedaBase, moedaAlvo, valor);
-            //} catch (Exception ex)
-            //{
-            //    Console.WriteLine(ex.Message);
-            //}
-
-            //return BuildResponse(moedaBase, moedaAlvo, valor);
-        //}
-
-        public static string BuildResponse(string moedaBase, string moedaAlvo, string valor)
+        private readonly ICotacaoRepository _repository;
+        public CotacaoController(ICotacaoRepository repository)
         {
-            CotacaoResponse response = new CotacaoResponse();
+            _repository = repository;
+        }
 
-            response.moedaBase = moedaBase;
-            response.moedaAlvo = moedaAlvo;
-            response.data = new DateTime();
-            response.valor = valor;
+        [HttpGet]
+        public async Task<IEnumerable<Cotacao>> GetCotacoes()
+        {
+            return await _repository.Get();
+        }
 
-            return JsonConvert.SerializeObject(response);
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Cotacao>> GetCotacao(int id)
+        {
+            return await _repository.Get(id);
+        }
+
+        [HttpGet("{moedaBase}, {moedaAlvo}")]
+        public async Task<ActionResult<Cotacao>> GetCotacao(string moedaBase, string moedaAlvo)
+        {
+            var nelson = await _repository.Get(moedaBase, moedaAlvo);
+
+            if (nelson == null) {
+                string valorCotacao = CotacaoUseCases.GetCotacaoSelenium(moedaBase, moedaAlvo);
+                Cotacao cotacao = CotacaoUseCases.BuildCotacao(moedaBase, moedaAlvo, valorCotacao);
+                return await PostNelson(cotacao);
+            }
+
+            return nelson;
+        }
+
+        [HttpPost]
+        public async Task<ActionResult<Cotacao>> PostNelson(Cotacao cotacao)
+        {
+            var newCotacao = await _repository.Create(cotacao);
+            return CreatedAtAction(nameof(GetCotacao), new { id = newCotacao.Id }, newCotacao);
+        }
+
+        [HttpDelete]
+        public async Task<ActionResult> Delete(int id)
+        {
+            var cotacaoToDelete = await _repository.Get(id);
+
+            if (cotacaoToDelete == null)
+            {
+                return NotFound();
+            }
+
+            await _repository.Delete(cotacaoToDelete.Id);
+            return NoContent();
+        }
+
+        [HttpPut]
+        public async Task<ActionResult> PutCotacoes(int id, [FromBody] Cotacao cotacao)
+        {
+            if (id == cotacao.Id)
+            {
+                return BadRequest();
+            }
+
+            await _repository.Update(cotacao);
+            return NoContent();
         }
     }
 }

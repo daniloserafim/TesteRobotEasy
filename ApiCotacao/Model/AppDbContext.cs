@@ -2,11 +2,11 @@
 
 namespace ApiCotacao.Model
 {
-    public class AppDbContext : DbContext
+    public class CotacaoContext : DbContext
     {
-        public AppDbContext(DbContextOptions options) : base(options)
+        public CotacaoContext(DbContextOptions<CotacaoContext> options) : base(options)
         {
-            
+            Database.EnsureCreated();
         }
         public DbSet<Cotacao> Cotacoes { get; set; }
     }
